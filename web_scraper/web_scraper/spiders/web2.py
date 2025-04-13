@@ -1,4 +1,5 @@
 import scrapy
+from urllib.parse import urljoin
 from pathlib import Path
 
 
@@ -17,8 +18,12 @@ class Web1Spider(scrapy.Spider):
         current_sub = None
         section_data = None
 
-        skip_titles = ["Care at Cleveland Clinic", "A note from Cleveland Clinic"]
+        skip_titles = ["Care at Cleveland Clinic", "A note from Cleveland Clinic","Cholesterol Levels FAQs"]
         skip_phrases = ["Advertisement", "Policy", "Cleveland Clinic is a non-profit"]
+        unwanted_image_keywords = [
+            "logo", "icon", "advert", "ad-", "social", "facebook", "twitter", "linkedin",
+            "pinterest", "email", "play-button", "branding", "promo", "subscribe", "print"
+        ]
 
         for elem in response.css('h1, h2,strong, li, p, img'):
             tag = elem.root.tag
@@ -60,8 +65,18 @@ class Web1Spider(scrapy.Spider):
 
             elif tag == 'img':
                 img_url = elem.attrib.get('src')
-                if img_url and section_data and section_data['title'] not in skip_titles:
-                    section_data['images'].append(response.urljoin(img_url))
+                alt_text = elem.attrib.get('alt', '').lower()
+                is_unwanted = False
 
+                if img_url:
+                    full_img_url = urljoin(response.url, img_url).lower()
+
+                    for keyword in unwanted_image_keywords:
+                        if keyword in full_img_url or keyword in alt_text:
+                            is_unwanted = True
+                            break
+
+                    if not is_unwanted and section_data and section_data['title'] not in skip_titles:
+                        section_data['images'].append(full_img_url)
         if section_data and section_data['title'] not in skip_titles:
             yield section_data
